@@ -55,19 +55,24 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     # TODO: Implement function
-    conv_1x1_vgg_layer7 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, padding='same', kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
-    conv_1x1_vgg_layer4 = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, padding='same', kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
-    conv_1x1_vgg_layer3 = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, padding='same', kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+
+    # apply scaling
+    vgg_layer3_out = tf.multiply(vgg_layer3_out, 0.0001)
+    vgg_layer4_out = tf.multiply(vgg_layer4_out, 0.01)
+
+    conv_1x1_layer7 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, padding='same', kernel_initializer=tf.truncated_normal_initializer(stddev=0.01), kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    conv_1x1_layer4 = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, padding='same', kernel_initializer=tf.truncated_normal_initializer(stddev=0.01), kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    conv_1x1_layer3 = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, padding='same', kernel_initializer=tf.truncated_normal_initializer(stddev=0.01), kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
 
     # FCN-8 Decoder
-    output = tf.layers.conv2d_transpose(conv_1x1_vgg_layer7, num_classes, 4, 2, padding='same', kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    output = tf.layers.conv2d_transpose(conv_1x1_layer7, num_classes, 4, 2, padding='same', kernel_initializer=tf.truncated_normal_initializer(stddev=0.01), kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
 
     # Skip Connections
-    output = tf.add(output, conv_1x1_vgg_layer4)
-    output = tf.layers.conv2d_transpose(conv_1x1_vgg_layer4, num_classes, 4, 2, padding='same', kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    output = tf.add(output, conv_1x1_layer4)
+    output = tf.layers.conv2d_transpose(output, num_classes, 4, 2, padding='same', kernel_initializer=tf.truncated_normal_initializer(stddev=0.01), kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
 
-    output = tf.add(output, conv_1x1_vgg_layer3)
-    output = tf.layers.conv2d_transpose(output, num_classes, 16, 8, padding='same', kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    output = tf.add(output, conv_1x1_layer3)
+    output = tf.layers.conv2d_transpose(output, num_classes, 16, 8, padding='same', kernel_initializer=tf.truncated_normal_initializer(stddev=0.01), kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
 
     return output
 tests.test_layers(layers)
@@ -107,13 +112,11 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
-    for epoch in range(epochs):
-        print ("Epoch: ", epoch+1)
+    for i in range(epochs):
         for image, label in get_batches_fn(batch_size):
-            feed_dict = {input_image: image, correct_label: label, keep_prob: 0.5, learning_rate: 0.00001}
-
+            feed_dict = {input_image: image, correct_label: label, keep_prob: 0.5, learning_rate: 0.0005}
             _, loss = sess.run([train_op, cross_entropy_loss], feed_dict=feed_dict)
-            print("Loss: ", loss)
+            print("Epoch: ", i+1, " Loss: {:.3f}".format(loss))
 
     pass
 tests.test_train_nn(train_nn)
@@ -143,11 +146,11 @@ def run():
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         # Parameters
-        epochs = 25
+        epochs = 40
         batch_size = 4
 
         # Placeholders
-        correct_label = tf.placeholder(tf.float32, [None, image_shape[0], image_shape[1], num_classes])
+        correct_label = tf.placeholder(tf.float32, [None, None, None, num_classes])
         keep_prob = tf.placeholder(tf.float32)
         learning_rate = tf.placeholder(tf.float32)
 
